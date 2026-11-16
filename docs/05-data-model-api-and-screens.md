@@ -15,7 +15,7 @@ All business data tables include workspace scope, IDs, creation/update times, an
 | `people` | Business name/role, linked organizations, public professional provenance; no unrelated personal profiling |
 | `contact_points` | Organization/person ID, email/phone/URL, normalized value, business-purpose classification, source, last seen |
 | `source_policies` | Terms, license, allowed fields/uses, AI/export flags, retention, limits, review/expiry state |
-| `source_records` | Source ID/key, import run, original identifiers, retrieval time, allowed payload reference, match state |
+| `source_records` | Source ID/key and family, listing URL, original directory category/location, listed business website, import/search cell, retrieval time, allowed payload reference, match state |
 | `evidence` | Fact key/value, source record or URL, excerpt/hash, observation time, extractor version, retention deadline |
 | `field_provenance` | Entity/field/value version to evidence IDs and source restrictions; supports field removal and downstream invalidation |
 | `signals` | Signal code, service affinity, evidence IDs, severity, human verification, expiry |
@@ -100,7 +100,7 @@ Use authentication, authorization, schema validation, pagination, rate limits, a
 1. **Overview:** new accounts, service-fit and budget boxes, unknown counts, contact-ready counts, meetings and spending.
 2. **Business explorer:** saved filters, map-free geography selectors, bulk review, export, merge candidates and exclusion reasons.
 3. **Account detail:** evidence beside every service observation and estimate, contact routes, entity relationships, confirmed budgets and history.
-4. **Coverage:** state/category/source matrix with partial runs and missing connectors.
+4. **Coverage:** state/category/source matrix with partial runs and missing connectors; directory catalog by region/industry, candidate/approved access state and incremental unique-business yield.
 5. **Research runs:** preview, start, pause, cursor progress, failures and cost breakdown.
 6. **Draft review:** source observation, chosen offer, subject/body, footer, eligibility and exact version approval.
 7. **Campaigns and inbox:** sequence state, replies, human owner, stops and delivery signals.

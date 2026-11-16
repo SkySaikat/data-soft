@@ -9,6 +9,7 @@ Ship a useful research/export product before enabling external outreach. Estimat
 - Confirm agency identity, real sender details, postal address, service catalog, portfolio proof and delivery capacity.
 - Seed all 50 states plus D.C., initial industry taxonomy, budget groups and explicit unknown values.
 - Inventory source policies; verify initial TDLR, DBPR, healthcare and licensed/permissioned discovery paths.
+- Catalog public business listing sites, chamber member directories, city/downtown directories and trade/professional directories. Review at least one directory candidate for the pilot; see [document 12](12-local-business-listings.md).
 - Create synthetic fixtures for six pilot industries and examples of branches, sole proprietors, shared domains and duplicate source records.
 - Record provisional spending limits and source/AI/privacy constraints.
 
@@ -26,10 +27,13 @@ Exit: import at least 1,000 synthetic/permitted records; re-import creates no du
 
 - Build policy registry, coverage cells, preview, worker queues, spending reservations and run checkpoints.
 - Implement initial official-file connectors and one permitted broad discovery path when available.
+- Implement a directory adapter with listing/detail extraction, source-specific pagination/export support and business-website handoff. Run at least one approved real directory in the pilot; if no candidate is approved, deliver/test the capability on synthetic fixtures and record the live-directory pilot gate as incomplete.
 - Add identity matching, bounded HTTP extraction and isolated browser fallback.
 - Track partial results, blocked sources, missing websites and uncertain business matches.
 
 Exit: a pilot across six industries in selected Texas/Florida areas produces attributable records or explicit documented gaps. Every collected field links to a source; run restarts do not multiply records; disallowed/expired sources cannot run; browser/network restrictions hold.
+
+Directory pilot gate: an approved listing source successfully supplies attributable business records and website handoffs. Synthetic tests establish adapter behavior but do not establish live-source coverage; record that distinction explicitly.
 
 ## Phase 3: useful grouping and drafts · 3–5 days
 
@@ -80,6 +84,7 @@ Exit for scaling: stable data quality, working stop behavior, permitted healthy 
 | DS-16 | P1 | Delivery/coverage/sales metrics and alerts | DS-06, DS-12, DS-14 |
 | DS-17 | P1 | More approved sources, categories and states | Pilot findings |
 | DS-18 | P2 | External CRM integration and consented SMS | Proven need, permitted provider and channel setup |
+| DS-19 | P0 | Directory catalog, listing/detail adapter, business-website handoff and approved-directory pilot | DS-02, DS-03, DS-05; source approval |
 
 ## Required meaningful acceptance tests
 
@@ -100,5 +105,6 @@ Use synthetic records and fake transport for automation; use our own recipients 
 13. **Global control:** stop switch halts all pending sends; opt-out survives restart and backup restoration; no new mailbox/campaign bypasses it.
 14. **Channel separation:** a public phone number without consent cannot receive SMS; an unscreened/unknown-time-zone number cannot become an eligible call task.
 15. **Recovery and access:** restore a backup, replay suppression/deletion changes, and prove unauthorized roles cannot read/export another workspace or retrieve secrets.
+16. **Directory-to-website flow:** approved listing records produce traceable leads; permitted website enrichment adds separate evidence; a duplicate from another directory updates the same business; missing websites/emails do not drop leads; capped pagination stays partial; the flow works with all Google discovery integrations disabled.
 
 Benchmark representative imports and browser jobs before assigning production throughput. Record memory, latency, error rates and dollar cost; no unmeasured “millions of leads per day” target belongs in the release promise.

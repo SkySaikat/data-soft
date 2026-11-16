@@ -4,6 +4,8 @@
 
 Combine broad business data, profession-specific public records, permitted business websites, and approved directories. No single source covers every profession and every operating business. A source's availability does not automatically establish permission for bulk reuse, AI processing, or outreach.
 
+**Local business listing websites are a core discovery channel.** The software must discover businesses on sites where owners or publishers list local services, then enrich those records from the businesses' own websites and other approved sources. Directory discovery must work independently of Google Maps, Google Business Profiles, or any one national provider. See the [dedicated listing inventory and connector requirements](12-local-business-listings.md).
+
 | Source | Intended use | Access and limitations | Release |
 | --- | --- | --- | --- |
 | Licensed U.S. business data | Broad cross-industry discovery; company identity and scale fields | API/export contract must allow our internal CRM, retention, enrichment, and intended prospecting | Pilot if an acceptable license fits the operating budget |
@@ -12,7 +14,10 @@ Combine broad business data, profession-specific public records, permitted busin
 | CMS NPPES | Healthcare organizations and professional practice discovery | Use official API/download options; identify practice business details; avoid clinical endpoints and personal-only information | Pilot healthcare slice |
 | Business-owned websites | Business contacts, services, locations, public team roles, dated announcements | Check source policy and robots directives; bounded crawl; no login or restricted access | Pilot |
 | State real estate/medical/bar and other licensing sources | Profession-specific coverage beyond the initial downloads | Connector-by-connector verification of bulk access, usage terms, scope, and fields | Expansion |
-| Chambers and trade associations | Supplemental category/location discovery | Permission or license required for our intended automated use | Expansion |
+| Local chambers and membership directories | City/region business discovery across categories | Review each publisher's automated access, member-data reuse and contact restrictions | Pilot: at least one approved directory |
+| Public national/local listing websites | Discover businesses by category, city, state or ZIP; collect allowed listing fields and website links | Named directory candidates require source-specific API, export, license or public-page usage review | Pilot connector capability; expand approved sources |
+| City/county, downtown and economic-development directories | Local shops, services, tenants and business clusters | Identify the publisher, actual geography, update frequency and permitted access/reuse | Initial catalog; expand by metro |
+| Professional and trade member directories | Sector-specific business/practice discovery | Review directory-specific permission; membership does not establish willingness to buy | Initial catalog; expand by industry |
 | Licensed search API | Locate first-party websites and fill research gaps | Provider terms must allow intended storage and use; search snippets are not authoritative business evidence | Optional |
 | Existing agency contacts and inbound forms | First-party pipeline and permissions | Store origin and channel-specific consent | Pilot |
 
@@ -22,18 +27,34 @@ TDLR and DBPR are discovery seeds, not ready-made email lists. DBPR's constructi
 
 NPPES includes downloadable monthly and incremental data, organizational names and practice-location reference files. Start with a bounded sample; stream larger files instead of loading the full national file into memory. An NPI is not a marketing qualification or proof that several practices share one owner. Do not use clinical messaging endpoints as sales addresses. [CMS source](https://www.cms.gov/medicare/regulations-guidance/administrative-simplification/data-dissemination).
 
+## Listing discovery followed by website enrichment
+
+1. Select an approved directory and the state/city/category cells it actually supports.
+2. Use its permitted API, export, feed, or bounded public-page traversal. Read listing/detail pages and pagination only within the approved scope; stop at source caps and record partial coverage.
+3. Extract only allowed fields: listing ID/URL, business name, listed category, city/state, business address/phone, business website, and published business email where actually present. Missing email is a normal outcome.
+4. Preserve the directory name, retrieval date, original values, listing status and upstream provenance if known. A self-submitted listing is a lead clue, not independent confirmation of every claim.
+5. Match the record to existing organizations/locations. Merge evidence while retaining source restrictions; do not send a new message because the same business appeared on another directory.
+6. Follow the business-owned website when available and permitted. Verify identity and extract relevant contact/about/service/location information using the website algorithm below.
+7. If a website is absent, blocked or ambiguous, retain the listing-derived lead with that status. Continue permitted verification or human research without inventing contact information.
+8. Verify a selected email separately, apply service/budget grouping, and check channel eligibility before outreach. Appearing in a public directory does not itself grant marketing consent.
+
+For example, a permitted chamber listing could identify a plumber and its website; the website could provide a business contact address and a service-page observation. Both sources remain attached to the account. If another permitted directory lists the same plumber, update the existing account instead of generating a second sequence. This is an illustrative workflow, not a report of collected data.
+
 ## Google Maps and restricted sources
 
 Do not implement automated Maps browsing or Places API exports as the CRM's lead harvesting source. Maps Platform restrictions include exporting content, saving business names/addresses/reviews, and using the services in a listings/directory service or advertising product. API access or a third-party scraper subscription does not itself authorize these uses. Any future Maps display needs a separate permitted-purpose and terms review. [Google Maps Platform terms, section 3.2.3](https://cloud.google.com/maps-platform/terms).
 
 Do not substitute scraped Google search results, Yelp, LinkedIn, Facebook, or another restricted platform without checking its terms and access rights. Keep those connectors disabled until a permitted integration exists. The browser component still has a useful role on permitted public business websites.
 
+Google Business Profile APIs are oriented toward managing Business Profile/location information. Treat authorized client-profile management as a separate future service integration, not an assumed national prospect feed. [Google Business Profile API overview](https://support.google.com/business/answer/6333473?hl=en).
+
 ## Source policy registry
 
 Every connector has a versioned record containing:
 
 ```text
-source_id, owner, entry_url, access_method, scope
+source_id, source_family, owner, entry_url, access_method, scope
+geographies, categories, listing_url_pattern, pagination_or_export_method
 terms_url, reviewed_at, review_due_at, decision, decision_reason
 permitted_fields, storage_ttl, export_allowed, ai_processing_allowed
 outreach_use_allowed, license_reference, attribution_requirements
@@ -74,6 +95,8 @@ Maintain a coverage ledger keyed by `state + county/metro + category + source + 
 First validate six categories: legal, medical practices, electricians, plumbers, renovation, and real estate, across selected Texas and Florida metros. Then add Georgia, North Carolina, Arizona, and the remaining states in measured waves. This is a rollout order, not a restriction on eventual coverage or a claim about the best markets.
 
 For every state/category, decide whether an approved broad source covers it, a specific connector is needed, or the cell remains a documented gap. Do not fan out every possible ZIP/category/source combination blindly. Use bulk files, source-supported pagination, geographic tiling only where licensed, and incremental refresh. Mark capped or truncated API results partial and subdivide only when permitted.
+
+Keep a directory catalog for each region and industry: national listings, local chambers, city/downtown directories and professional/trade directories. Expand the catalog alongside public-record connectors. Track each directory's incremental unique businesses and valid business website/contact yield so duplicate-heavy sources do not consume the whole collection budget.
 
 Coverage metrics describe our configured search coverage and source yields. “All 51 geography rows processed” does not mean all U.S. businesses were found.
 

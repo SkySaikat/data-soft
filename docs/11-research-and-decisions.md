@@ -11,6 +11,8 @@ Official references checked November 16, 2026. Recheck relevant source terms, co
 | Florida construction | [Public records](https://www2.myfloridalicense.com/construction-industry/public-records/), [disclaimer](https://www2.myfloridalicense.com/public-records-read-medisclaimer/) | Parse documented files/status; confirm business identity |
 | Healthcare discovery | [CMS NPPES dissemination](https://www.cms.gov/medicare/regulations-guidance/administrative-simplification/data-dissemination) | Official API/download path; practice business data only |
 | Broad licensed coverage | [Data Axle APIs](https://www.data-axle.com/data-solutions/apis/) | Procurement candidate; no license or quote obtained |
+| Business listing candidates | [Yellow Pages](https://www.yellowpages.com/), [BBB business search](https://www.bbb.org/Search), [Austin Chamber members](https://www.austinchamber.com/membership/our-members), [Greater Austin Asian Chamber directory](https://members.austinasianchamber.org/directory/Find) | Listing/directory pages identified; bulk collection and reuse permission not established |
+| Google Business Profile | [API overview](https://support.google.com/business/answer/6333473?hl=en) | Profile management integration is distinct from prospect discovery |
 | Commercial email | [FTC CAN-SPAM guide](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business) | Requirements summarized in channel rules |
 | Calling | [FTC telemarketing guide](https://www.ftc.gov/business-guidance/resources/complying-telemarketing-sales-rule), [FCC consent clarification](https://docs.fcc.gov/public/attachments/DA-25-496A1.pdf) | Configure actual use-case/jurisdiction rules before activation |
 | Gmail receiving requirements | [Sender guidelines](https://support.google.com/mail/answer/81126?hl=en), [FAQ](https://support.google.com/mail/answer/14229414) | Authentication and complaint controls; no inbox guarantee |
@@ -31,6 +33,7 @@ Some research paths returned fetch errors or rate limits; no blocked endpoint is
 - Keep all five budget groups, including unknown; allow smaller one-time and recurring offers.
 - Prefer deterministic collection and processing; selectively use AI for bounded tasks.
 - Use permitted official/licensed sources and business websites; no reliance on restricted Maps harvesting.
+- Treat approved local business listing and membership directories as core discovery sources, with website enrichment and deduplication across publishers; maintain the [directory-source catalog](12-local-business-listings.md).
 - Ship internal research/export before messaging activation; future SMS requires its own consent workflow.
 
 ## Assumptions to validate

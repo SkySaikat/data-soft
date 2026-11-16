@@ -7,7 +7,7 @@ Use a web dashboard for review and sales work, background workers for collection
 ```mermaid
 flowchart TD
     A[State and category campaign] --> B[Source policy and cost check]
-    B --> C[Downloads and licensed APIs]
+    B --> C[Approved directories, downloads and APIs]
     C --> D[Normalize and resolve businesses]
     D --> E[Permitted website extraction]
     E --> F[Evidence and service signals]
@@ -49,6 +49,7 @@ apps/web/                       dashboard and internal API
 apps/worker/                    collection, enrichment, scheduling
 packages/domain/                entities, eligibility rules, scoring
 packages/connectors/            policy-aware source adapters
+packages/connectors/directories/ listing, membership and local directory adapters
 packages/extraction/            HTML parsing and bounded browser logic
 packages/messaging/             sender and inbound event adapters
 packages/ai/                    typed prompts, validators, usage limits
@@ -67,6 +68,8 @@ docs/                          these plans and future operating guides
 ## Job contracts
 
 Each job includes workspace, run, account/source IDs, policy version, idempotency key, cost reservation, attempt count, timeout, and cursor where relevant. Queue payloads hold IDs, not full personal records or API credentials.
+
+Directory connectors expose separate discovery-page and listing-detail steps, plus the business-owned website handoff. They support approved APIs/exports or bounded HTML/browser traversal, source-specific field mappings, pagination caps and incremental refresh. Source policy chooses the access method; a shared directory template never grants permission across every publisher using that template.
 
 Queues: `discovery`, `normalization`, `site-fetch`, `browser-render`, `contact-enrichment`, `verification`, `ai-draft`, `send-dispatch`, `inbound-events`, and `refresh`. Give inbound events and opt-outs priority over discovery.
 

@@ -1,6 +1,6 @@
 # Data Soft: U.S. local business lead and sales platform
 
-Planning package v1.0 · November 16, 2026
+Planning package v1.1 · November 16, 2026
 
 ## What we are building
 
@@ -33,6 +33,13 @@ The dashboard will separate:
 9. [Implementation roadmap and acceptance tests](docs/09-build-roadmap-and-acceptance.md)
 10. [Daily operations, metrics, and launch checklist](docs/10-operations-metrics-and-launch.md)
 11. [Verified references, assumptions, and decisions](docs/11-research-and-decisions.md)
+12. [Local business listings, directory candidates, and collection requirements](docs/12-local-business-listings.md)
+
+## Where the business data comes from
+
+The discovery plan covers public business listing websites, local chamber member directories, city/county and downtown business directories, professional/trade directories, official public records, and licensed national business datasets. For each usable listing, follow its business website link to collect and verify relevant business contact details, services, locations, and website improvement opportunities where that access is permitted. A business without a website remains in the lead database.
+
+Directory connectors are a core discovery requirement. Named sites such as Yellow Pages, BBB, and local chamber directories are research candidates; their public visibility does not establish bulk collection or reuse rights. The [listing-source inventory](docs/12-local-business-listings.md) distinguishes candidates from approved connectors. Google Maps and Google Business Profiles are not required to discover leads.
 
 ## Recommended starting point
 
