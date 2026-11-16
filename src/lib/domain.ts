@@ -102,9 +102,41 @@ export type Lead = LeadInput & {
   contacts?: PublicContact[];
   emailSuppressed?: boolean;
 };
-export type PublicContact = { id: string; leadId: string; kind: "email" | "phone"; value: string; sourceUrl: string; foundAt: string; status: "publicly_listed" | "imported"; e164: string; phoneType: string };
-export type WorkJob = { id: string; kind: string; status: string; payload: Record<string, unknown>; progress: number; total: number; message: string; result: Record<string,unknown> | null; createdAt: string; updatedAt: string };
-export type OutboundMessage = { id: string; leadId: string; recipient: string; subject: string; body: string; status: string; providerId: string; error: string; createdAt: string; sentAt: string | null };
+export type PublicContact = {
+  id: string;
+  leadId: string;
+  kind: "email" | "phone";
+  value: string;
+  sourceUrl: string;
+  foundAt: string;
+  status: "publicly_listed" | "imported";
+  e164: string;
+  phoneType: string;
+};
+export type WorkJob = {
+  id: string;
+  kind: string;
+  status: string;
+  payload: Record<string, unknown>;
+  progress: number;
+  total: number;
+  message: string;
+  result: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type OutboundMessage = {
+  id: string;
+  leadId: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: string;
+  providerId: string;
+  error: string;
+  createdAt: string;
+  sentAt: string | null;
+};
 export type Source = {
   id: string;
   name: string;

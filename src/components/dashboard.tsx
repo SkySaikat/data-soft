@@ -50,8 +50,12 @@ import {
   type Workspace,
 } from "@/lib/domain";
 import { Dialog } from "./dialog";
+import { CollectionPanel } from "./collection-panel";
+import { MailWorkspace, ComposeEmail } from "./mail-workspace";
+import { ContactPanel } from "./contact-panel";
+import { PageSize } from "./page-size";
 
-type View = "leads" | "collection" | "sources" | "ai" | "settings";
+type View = "leads" | "collection" | "sources" | "ai" | "mail" | "settings";
 type Settings = {
   ai: { ready: boolean; model: string; monthlyCap: number; spent: number };
   database: string;
@@ -74,6 +78,7 @@ const NAV = [
   { id: "collection", label: "Collect leads", icon: Compass },
   { id: "sources", label: "Source library", icon: Database },
   { id: "ai", label: "AI studio", icon: Sparkles },
+  { id: "mail", label: "Email & calling", icon: Mail },
 ] as const;
 const EMPTY_FILTERS: Filters = {
   q: "",
@@ -85,6 +90,7 @@ const EMPTY_FILTERS: Filters = {
   status: "",
   sort: "priority",
   page: "1",
+  pageSize: "100",
 };
 const STATUS_LABELS: Record<LeadStatus, string> = {
   new: "New lead",
@@ -145,6 +151,8 @@ export function Dashboard() {
     [detail, setDetail] = useState<Lead | null>(null),
     [addOpen, setAddOpen] = useState(false),
     [importOpen, setImportOpen] = useState(false);
+  const [composeLead, setComposeLead] = useState<Lead | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const notify = useCallback((message: string) => setNotice(message), []);
   const reload = useCallback(() => setRefresh((v) => v + 1), []);
   useEffect(() => {
@@ -153,6 +161,14 @@ export function Dashboard() {
       url.searchParams.get("workspace") ||
       localStorage.getItem("data-soft-workspace");
     if (saved === "live") setWorkspace("live");
+    const storedSize = localStorage.getItem("data-soft-page-size");
+    if (
+      storedSize &&
+      (storedSize === "all" ||
+        /^[1-9][0-9]{0,3}$/.test(storedSize) ||
+        storedSize === "10000")
+    )
+      setFilters((f) => ({ ...f, pageSize: storedSize }));
     const v = url.searchParams.get("view");
     if (NAV.some((n) => n.id === v) || v === "settings") setView(v as View);
   }, []);
@@ -215,6 +231,53 @@ export function Dashboard() {
       active = false;
     };
   }, [refresh]);
+  useEffect(() => {
+    if (filters.pageSize)
+      localStorage.setItem("data-soft-page-size", filters.pageSize);
+  }, [filters.pageSize]);
+  async function researchSelected() {
+    setBulkBusy(true);
+    try {
+      if (selected.size > 1000)
+        throw new Error("Choose up to 1,000 leads per website-research job.");
+      if (workspace !== "live")
+        throw new Error(
+          "Choose the live workspace for business website research.",
+        );
+      await api("enrich", post({ leadIds: [...selected] }));
+      setSelected(new Set());
+      setView("collection");
+      notify("Website research queued. Progress is shown below.");
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+  async function exportData() {
+    try {
+      const response = await fetch(
+        "/api/export",
+        post({
+          workspace,
+          filters,
+          ...(selected.size ? { ids: [...selected] } : {}),
+        }),
+      );
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Export failed");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `data-soft-${workspace}-leads.csv`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setError((error as Error).message);
+    }
+  }
   function updateFilter(key: keyof Filters, value: string) {
     setFilters((f) => ({ ...f, [key]: value, page: "1" }));
     setSelected(new Set());
@@ -222,7 +285,7 @@ export function Dashboard() {
   function changeWorkspace(next: Workspace) {
     setWorkspace(next);
     setSelected(new Set());
-    setFilters(EMPTY_FILTERS);
+    setFilters((current) => ({ ...EMPTY_FILTERS, pageSize: current.pageSize }));
     setDetail(null);
   }
   function imported(message: string) {
@@ -232,7 +295,8 @@ export function Dashboard() {
     notify(message);
   }
   const activeFilters = Object.entries(filters).filter(
-    ([key, value]) => value && !["q", "sort", "page", "ids"].includes(key),
+    ([key, value]) =>
+      value && !["q", "sort", "page", "pageSize", "ids"].includes(key),
   );
   const query = new URLSearchParams({
     workspace,
@@ -300,7 +364,7 @@ export function Dashboard() {
             onClick={() => setView("settings")}
           >
             <Settings2 size={18} />
-            Settings<span className="version">v0.1</span>
+            Settings<span className="version">v0.2</span>
           </button>
           <div className="profile">
             <span className="profile-avatar">SA</span>
@@ -361,10 +425,13 @@ export function Dashboard() {
                   <p>A clearer picture of every local opportunity.</p>
                 </div>
                 <div className="heading-actions">
-                  <a className="button secondary" href={`/api/export?${query}`}>
+                  <button
+                    className="button secondary"
+                    onClick={() => void exportData()}
+                  >
                     <Download size={16} />
                     Export{selected.size ? ` (${selected.size})` : ""}
-                  </a>
+                  </button>
                   <button
                     className="button primary"
                     onClick={() => setAddOpen(true)}
@@ -475,6 +542,12 @@ export function Dashboard() {
                     Import CSV
                   </button>
                 </div>
+                <div className="list-display-options">
+                  <PageSize
+                    value={filters.pageSize || "100"}
+                    onChange={(value) => updateFilter("pageSize", value)}
+                  />
+                </div>
                 <div className="filter-bar">
                   <label className="search-box">
                     <Search size={17} />
@@ -530,6 +603,25 @@ export function Dashboard() {
                     <option value="recent">Newest first</option>
                   </select>
                 </div>
+                {selected.size ? (
+                  <div className="bulk-actions">
+                    <strong>{selected.size} selected</strong>
+                    <button
+                      className="button secondary"
+                      disabled={bulkBusy || workspace !== "live"}
+                      onClick={() => void researchSelected()}
+                    >
+                      <Search size={14} />
+                      Find websites & public contacts
+                    </button>
+                    <button
+                      className="text-button"
+                      onClick={() => setSelected(new Set())}
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                ) : null}
                 <div className="subfilters">
                   <label>
                     <MapPin size={13} />
@@ -544,7 +636,10 @@ export function Dashboard() {
                     <button
                       className="text-button"
                       onClick={() => {
-                        setFilters(EMPTY_FILTERS);
+                        setFilters((current) => ({
+                          ...EMPTY_FILTERS,
+                          pageSize: current.pageSize,
+                        }));
                         setSelected(new Set());
                       }}
                     >
@@ -590,6 +685,7 @@ export function Dashboard() {
                               Business <ArrowDownUp size={11} />
                             </th>
                             <th>Location</th>
+                            <th>Public contacts</th>
                             <th>Service needs</th>
                             <th>Est. budget / mo.</th>
                             <th>Priority</th>
@@ -638,6 +734,27 @@ export function Dashboard() {
                                     {STATES.find((s) => s.code === lead.state)
                                       ?.name || lead.state}
                                   </small>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="table-contact">
+                                  {lead.email ? (
+                                    <button
+                                      title={lead.email}
+                                      onClick={() => setComposeLead(lead)}
+                                    >
+                                      {lead.email}
+                                    </button>
+                                  ) : (
+                                    <span>No email found</span>
+                                  )}
+                                  {lead.phone ? (
+                                    <small title={lead.phone}>
+                                      {lead.phone}
+                                    </small>
+                                  ) : (
+                                    <small>No phone recorded</small>
+                                  )}
                                 </div>
                               </td>
                               <td>
@@ -756,7 +873,10 @@ export function Dashboard() {
                       className="button primary"
                       onClick={() =>
                         data?.summary.total
-                          ? setFilters(EMPTY_FILTERS)
+                          ? setFilters((current) => ({
+                              ...EMPTY_FILTERS,
+                              pageSize: current.pageSize,
+                            }))
                           : setView("collection")
                       }
                     >
@@ -779,14 +899,12 @@ export function Dashboard() {
             </>
           ) : null}
           {view === "collection" ? (
-            <Collection
+            <CollectionPanel
               sources={sources}
               runs={runs}
-              onComplete={(message) => {
-                imported(message);
-              }}
+              onQueued={() => changeWorkspace("live")}
+              onChanged={reload}
               onImport={() => setImportOpen(true)}
-              onRunRefresh={reload}
             />
           ) : null}
           {view === "sources" ? (
@@ -853,7 +971,8 @@ export function Dashboard() {
                   <p>
                     Candidate sources stay disabled until their access and reuse
                     terms support your collection. This release does not scrape
-                    Google Maps or send outreach.
+                    Google Maps. Reviewed email sending is separate from
+                    collection.
                   </p>
                 </div>
               </div>
@@ -943,6 +1062,7 @@ export function Dashboard() {
               </div>
             </>
           ) : null}
+          {view === "mail" ? <MailWorkspace /> : null}
           {view === "settings" ? <SettingsView settings={settings} /> : null}
         </main>
       </div>
@@ -980,6 +1100,9 @@ export function Dashboard() {
             imported(m);
           }}
         />
+      ) : null}
+      {composeLead ? (
+        <ComposeEmail lead={composeLead} onClose={() => setComposeLead(null)} />
       ) : null}
       {detail ? (
         <LeadDetail
@@ -1381,250 +1504,6 @@ function ImportDialog({
   );
 }
 
-function Collection({
-  sources,
-  runs,
-  onComplete,
-  onImport,
-  onRunRefresh,
-}: {
-  sources: Source[];
-  runs: CollectionRun[];
-  onComplete: (m: string) => void;
-  onImport: () => void;
-  onRunRefresh: () => void;
-}) {
-  const [source, setSource] = useState<"nppes" | "directory">("nppes"),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    const form = Object.fromEntries(new FormData(e.currentTarget));
-    try {
-      const result = await api<{
-        imported: number;
-        updated: number;
-        message: string;
-      }>(
-        "collect",
-        post({
-          ...form,
-          source,
-          permissionConfirmed: form.permissionConfirmed === "on",
-        }),
-      );
-      onComplete(
-        `${result.imported} businesses added, ${result.updated} updated. ${result.message}`,
-      );
-    } catch (e) {
-      setError((e as Error).message);
-      onRunRefresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <Heading
-        eyebrow="MORE SOURCES. MORE OPPORTUNITIES."
-        title="Collect leads"
-        description="Discover local businesses and keep their source history from the first record."
-      />
-      <div className="collection-layout">
-        <section className="panel collection-panel">
-          <div className="panel-heading">
-            <span className="green-icon">
-              <Compass size={21} />
-            </span>
-            <div>
-              <h2>Start a collection</h2>
-              <p>New records go to your live workspace.</p>
-            </div>
-          </div>
-          <div className="source-choices">
-            <button
-              aria-pressed={source === "nppes"}
-              className={source === "nppes" ? "selected" : ""}
-              onClick={() => setSource("nppes")}
-            >
-              <Building2 size={19} />
-              <strong>Healthcare directory</strong>
-              <span>Public NPPES organization listings</span>
-            </button>
-            <button
-              aria-pressed={source === "directory"}
-              className={source === "directory" ? "selected" : ""}
-              onClick={() => setSource("directory")}
-            >
-              <Globe size={19} />
-              <strong>Approved directory</strong>
-              <span>Structured local business listings</span>
-            </button>
-          </div>
-          <form onSubmit={submit}>
-            <div className="form-grid">
-              <label className="field">
-                State
-                <select name="state" defaultValue="TX" required>
-                  {STATES.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                City
-                <input name="city" placeholder="Optional, e.g. Austin" />
-              </label>
-              {source === "nppes" ? (
-                <label className="field full">
-                  Organization name keyword
-                  <input
-                    name="keyword"
-                    placeholder="Optional, e.g. family, dental, clinic"
-                  />
-                </label>
-              ) : (
-                <>
-                  <label className="field full">
-                    Directory page URL
-                    <input
-                      name="url"
-                      type="url"
-                      required
-                      placeholder="https://approved-directory.com/businesses"
-                    />
-                  </label>
-                  <label className="field full">
-                    Directory name
-                    <input
-                      name="sourceName"
-                      required
-                      minLength={2}
-                      placeholder="Name of the listing publisher"
-                    />
-                  </label>
-                  <label className="consent full">
-                    <input
-                      type="checkbox"
-                      name="permissionConfirmed"
-                      required
-                    />
-                    <span>
-                      This directory permits my intended automated access and
-                      reuse. The connector will also check robots directives.
-                    </span>
-                  </label>
-                </>
-              )}
-            </div>
-            <div className="collection-limit">
-              <Info size={16} />
-              <span>
-                {source === "nppes"
-                  ? "Up to 50 public organization records per run. Emails, websites, budget and service needs may be unknown. This is not complete geographic coverage."
-                  : "Reads up to 100 JSON-LD business listings from one page. Pagination, website enrichment, and browser rendering are planned. Restricted platforms stay disabled."}
-              </span>
-            </div>
-            {error ? (
-              <p role="alert" className="form-error">
-                {error}
-              </p>
-            ) : null}
-            <button className="button primary" disabled={busy}>
-              {busy ? (
-                <LoaderCircle className="spin" size={17} />
-              ) : (
-                <Compass size={17} />
-              )}{" "}
-              {busy ? "Collecting business listings…" : "Start collection"}
-            </button>
-          </form>
-        </section>
-        <aside className="collection-aside">
-          <article className="panel">
-            <span className="green-icon">
-              <Upload size={23} />
-            </span>
-            <h3>Already have a list?</h3>
-            <p>
-              Import a permitted directory export or your own business research.
-              We’ll retain source history and merge exact duplicates.
-            </p>
-            <button className="button secondary" onClick={onImport}>
-              Import CSV <ArrowRight size={15} />
-            </button>
-          </article>
-          <article className="coverage-card">
-            <span className="eyebrow">BUILT FOR BROADER COVERAGE</span>
-            <h3>Every local business belongs.</h3>
-            <p>
-              Trades, practices, shops, and independent professionals. No
-              minimum revenue or retainer filter.
-            </p>
-            <div>
-              {sources.filter((s) => s.status === "available").length} available
-              source methods <span className="online-dot" />
-            </div>
-          </article>
-        </aside>
-      </div>
-      <section className="panel runs-panel">
-        <h2>
-          Collection history <span>{runs.length}</span>
-        </h2>
-        {runs.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Area</th>
-                  <th>Result</th>
-                  <th>New / updated</th>
-                  <th>Started</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map((run) => (
-                  <tr key={run.id}>
-                    <td>
-                      <strong>{run.source}</strong>
-                      <small className="run-message">{run.message}</small>
-                    </td>
-                    <td>{[run.city, run.state].filter(Boolean).join(", ")}</td>
-                    <td>
-                      <span
-                        className={`source-status ${run.status === "failed" ? "red" : run.status === "partial" ? "amber" : "green"}`}
-                      >
-                        {run.status}
-                      </span>
-                    </td>
-                    <td>
-                      {run.imported} / {run.updated}
-                    </td>
-                    <td className="nowrap">
-                      {new Date(run.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="small-empty">
-            <Database size={22} />
-            <p>No live collection runs yet. Your first run will appear here.</p>
-          </div>
-        )}
-      </section>
-    </>
-  );
-}
-
 function LeadDetail({
   lead,
   aiReady,
@@ -1745,10 +1624,11 @@ function LeadDetail({
               ) : null}
               <div className="mini-note">
                 <ShieldCheck size={14} />
-                Contact details are unverified. No outreach is sent by this
-                release.
+                Public contact details are unverified. Email requires a
+                configured sender and explicit message review.
               </div>
             </section>
+            <ContactPanel lead={lead} onUpdated={onUpdated} notify={notify} />
             <section className="detail-section">
               <h3>Service needs to research</h3>
               <div className="service-tags">
@@ -1998,6 +1878,20 @@ function SettingsView({ settings }: { settings: Settings | null }) {
         title="Workspace settings"
         description="Your local data, your integration choices, and a clear path to what comes next."
       />
+      <div className="info-box">
+        <Globe size={19} />
+        <div>
+          <strong>Website lookup for missing sites</strong>
+          <p>
+            Listed websites are used without a search subscription. For missing
+            sites, optionally configure BRAVE_SEARCH_API_KEY,
+            SEARCH_STORAGE_RIGHTS_CONFIRMED=true and
+            SEARCH_MONTHLY_REQUEST_LIMIT in .env.local. Use a plan with storage
+            rights; ambiguous matches require manual review. The collection
+            worker starts with pnpm dev / pnpm start.
+          </p>
+        </div>
+      </div>
       <div className="settings-grid">
         <section className="panel">
           <div className="panel-heading">
@@ -2023,7 +1917,7 @@ function SettingsView({ settings }: { settings: Settings | null }) {
             </div>
             <div>
               <dt>Release</dt>
-              <dd>{settings?.version || "0.1.0"}</dd>
+              <dd>{settings?.version || "0.2.0"}</dd>
             </div>
           </dl>
           <p className="muted">
@@ -2092,14 +1986,14 @@ function SettingsView({ settings }: { settings: Settings | null }) {
             <h2>Collection boundaries</h2>
           </div>
           <p>
-            Available: authorized CSV imports, bounded NPPES organization
-            searches, and approved single-page JSON-LD directory collection.
+            Available: cross-industry OpenStreetMap discovery, public website
+            contact research, authorized CSV imports, NPPES organization
+            searches, and approved JSON-LD directories.
           </p>
           <p className="muted">
-            Upcoming: additional directory formats, pagination, first-party
-            website enrichment, browser workers, verified contact enrichment,
-            and authenticated hosting. Email, SMS, and automated calling are not
-            enabled.
+            Upcoming: more directory formats, specialist contact verification
+            and authenticated hosting. Reviewed SMTP email is available in Email
+            & calling. SIP/VoIP calls and SMS are not connected yet.
           </p>
         </section>
       </div>

@@ -1,0 +1,364 @@
+.three-choices {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.three-choices button {
+  padding: 14px 12px;
+  min-width: 0;
+}
+.three-choices strong {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.three-choices span {
+  line-height: 1.7;
+}
+.job-list {
+  padding: 0 20px 20px;
+  display: grid;
+  gap: 12px;
+}
+.job-card {
+  border: 1px solid #e2e9db;
+  border-radius: 6px;
+  padding: 17px;
+  background: #fcfdf9;
+}
+.job-card.highlight {
+  border-color: #9fb78b;
+  background: #f7faf1;
+}
+.job-title {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+.job-title strong {
+  font-size: 12px;
+  color: #526d43;
+}
+.job-card > p {
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 11px 0;
+  color: #7b8e6b;
+}
+.job-card progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  accent-color: #457048;
+  margin: 13px 0 9px;
+}
+.job-card small {
+  font-size: 10px;
+  color: #788c66;
+}
+.job-card details {
+  margin-top: 15px;
+  font-size: 11px;
+  color: #718760;
+  line-height: 1.9;
+}
+.job-card details ul {
+  padding-left: 19px;
+  max-height: 280px;
+  overflow: auto;
+}
+.job-card li {
+  margin: 10px 0;
+}
+.job-card summary,
+.website-editor summary {
+  cursor: pointer;
+}
+.source-status.blue {
+  color: #5c7c97;
+  background: #f0f5fa;
+  border-color: #dae7f0;
+}
+.info-box.compact {
+  margin: 0 0 20px;
+}
+.compact p {
+  margin: 0;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.mail-footer-preview {
+  border: 1px solid #e4eadb;
+  border-radius: 5px;
+  background: #f7faf2;
+  padding: 17px;
+  margin-top: 20px;
+}
+.mail-footer-preview strong {
+  font-size: 11px;
+  color: #60794f;
+}
+.mail-footer-preview p {
+  font-size: 11px;
+  line-height: 1.9;
+  color: #7c916b;
+  margin-top: 10px;
+  white-space: pre-wrap;
+}
+.send-result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+  padding: 35px 15px;
+  color: #688855;
+}
+.send-result p {
+  font-size: 12px;
+  line-height: 1.9;
+}
+.send-result h3 {
+  font-size: 18px;
+}
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+.public-contact-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+.public-contact {
+  border: 1px solid #e5ecdc;
+  border-radius: 5px;
+  padding: 13px;
+  background: #fcfdf9;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+.public-contact > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6f875d;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.public-contact strong {
+  font-weight: 550;
+}
+.public-contact small {
+  font-size: 9px;
+  color: #829373;
+  line-height: 1.8;
+}
+.public-contact a {
+  font-size: 10px;
+  color: #5c7e49;
+  text-decoration: underline;
+}
+.website-editor {
+  margin: 20px 0;
+  color: #7c9468;
+  font-size: 11px;
+}
+.website-editor summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.website-editor form {
+  margin-top: 17px;
+}
+.page-size-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: #6b805b;
+}
+.page-size-control > label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.page-size-control select {
+  border: 1px solid #dce5d2;
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #5e784c;
+  font-size: 11px;
+  min-width: 78px;
+}
+.page-size-control form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-size-control input {
+  width: 76px;
+  padding: 7px;
+  border: 1px solid #dde6d4;
+  border-radius: 4px;
+  color: #688452;
+  background: #fff;
+  font-size: 11px;
+}
+.page-size-control > span {
+  font-size: 10px;
+  color: #8b987f;
+}
+.list-display-options {
+  padding: 10px 18px;
+  border-bottom: 1px solid #edf1e7;
+  background: #fdfefb;
+}
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 10px 18px;
+  margin: 0 18px 10px;
+  background: #f0f6e9;
+  border: 1px solid #dce8ce;
+  border-radius: 5px;
+  color: #6c8659;
+  font-size: 11px;
+}
+.bulk-actions strong {
+  font-weight: 550;
+}
+.bulk-actions .button {
+  font-size: 10px;
+  padding: 7px 10px;
+  min-height: 30px;
+}
+.table-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: 180px;
+  font-size: 10px;
+  min-width: 130px;
+}
+.table-contact > button {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #597d44;
+  font-size: 10px;
+}
+.table-contact > small {
+  font-size: 9px;
+  color: #819270;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table-contact > span {
+  font-size: 10px;
+  color: #96a287;
+}
+.settings-grid {
+  margin-top: 20px;
+}
+.public-contacts > .muted {
+  margin-top: 15px;
+}
+.mail-footer-preview + .consent {
+  padding-top: 10px;
+}
+.stack .panel > form {
+  margin-top: 20px;
+}
+.two-column .panel h3 {
+  margin-top: 25px;
+}
+.runs-panel details .draft-text {
+  max-width: 550px;
+  max-height: 250px;
+  overflow: auto;
+}
+.runs-panel summary {
+  cursor: pointer;
+  font-size: 10px;
+  color: #63834e;
+}
+.page-size-control select:focus-visible {
+  outline-color: #78a164;
+}
+@media (max-width: 1100px) {
+  .three-choices {
+    grid-template-columns: 1fr;
+  }
+  .three-choices button {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 5px 9px;
+  }
+  .three-choices button > svg {
+    grid-row: 1/3;
+  }
+  .three-choices span {
+    grid-column: 2;
+  }
+  .bulk-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 600px) {
+  .page-size-control {
+    font-size: 10px;
+  }
+  .list-display-options {
+    padding: 10px 12px;
+  }
+  .page-size-control select {
+    font-size: 10px;
+  }
+  .job-list {
+    padding: 0 12px 12px;
+  }
+  .job-title {
+    align-items: flex-start;
+  }
+  .job-title strong {
+    font-size: 11px;
+  }
+  .job-card {
+    padding: 13px;
+  }
+  .bulk-actions {
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 10px;
+    font-size: 10px;
+  }
+  .contact-actions .button {
+    font-size: 10px;
+  }
+  .public-contact {
+    padding: 11px;
+  }
+  .mail-footer-preview {
+    padding: 13px;
+  }
+  .send-result {
+    padding: 25px 5px;
+  }
+}

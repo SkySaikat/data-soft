@@ -71,8 +71,23 @@ export class Repository {
       CREATE INDEX IF NOT EXISTS message_hash ON outbound_messages(content_hash,created_at);
       PRAGMA user_version=2;`);
     const sourceSeeds = [
-      ["osm", "OpenStreetMap local businesses", "Open business listings", "https://www.openstreetmap.org/copyright", "available", "Plumbers, electricians, lawyers, real estate and other businesses. Bounded city-area searches; © OpenStreetMap contributors, ODbL 1.0."],
-      ["website", "Business website enrichment", "Public business contacts", "", "available", "Read permitted homepage/contact pages for public emails and phones. Source evidence is retained; no email guessing."],
+      ["ny-public","New York public business records","Government business/practice listings","https://data.cityofnewyork.us/d/t8hj-ruu2","available","Official NYC trade business contacts and NY legal/real estate office listings. New York coverage only; websites enriched separately."],
+      [
+        "osm",
+        "OpenStreetMap local businesses",
+        "Open business listings",
+        "https://www.openstreetmap.org/copyright",
+        "available",
+        "Plumbers, electricians, lawyers, real estate and other businesses. Bounded city-area searches; © OpenStreetMap contributors, ODbL 1.0.",
+      ],
+      [
+        "website",
+        "Business website enrichment",
+        "Public business contacts",
+        "",
+        "available",
+        "Read permitted homepage/contact pages for public emails and phones. Source evidence is retained; no email guessing.",
+      ],
       [
         "csv",
         "CSV & manual import",
@@ -249,7 +264,17 @@ export class Repository {
             )
             .run(workspace, input.sourceName, input.sourceRecordId, id);
         ids.push(id);
-        for (const [kind,value] of [["email",input.email],["phone",input.phone]] as const) if (value) this.addContact(id,{kind,value,sourceUrl:input.sourceUrl,status:"imported"});
+        for (const [kind, value] of [
+          ["email", input.email],
+          ["phone", input.phone],
+        ] as const)
+          if (value)
+            this.addContact(id, {
+              kind,
+              value,
+              sourceUrl: input.sourceUrl,
+              status:/^(CMS NPPES|NYC DOB|NYS attorney|NYS real estate|OpenStreetMap)/.test(input.sourceName)?"publicly_listed":"imported",
+            });
       }
       this.db.exec("COMMIT");
       return { imported, updated, ids };
@@ -390,7 +415,13 @@ export class Repository {
         .prepare(`SELECT count(*) n FROM leads WHERE ${where}`)
         .get(...values)!.n,
     );
-    const pageSize = filters.pageSize === "all" ? Math.max(1,total) : Math.max(1,Math.min(10000,Number.parseInt(filters.pageSize || "100") || 100));
+    const pageSize =
+      filters.pageSize === "all"
+        ? Math.max(1, total)
+        : Math.max(
+            1,
+            Math.min(10000, Number.parseInt(filters.pageSize || "100") || 100),
+          );
     const rows = this.db
       .prepare(
         `SELECT * FROM leads WHERE ${where} ORDER BY ${order} LIMIT ? OFFSET ?`,
@@ -400,17 +431,44 @@ export class Repository {
         exportAll ? -1 : pageSize,
         exportAll ? 0 : (page - 1) * pageSize,
       );
-    const grouped = this.db.prepare("SELECT budget,count(*) n FROM leads WHERE workspace=? GROUP BY budget").all(workspace);
+    const grouped = this.db
+      .prepare(
+        "SELECT budget,count(*) n FROM leads WHERE workspace=? GROUP BY budget",
+      )
+      .all(workspace);
     const budgets = Object.fromEntries(
       Object.keys(BUDGETS).map((b) => [b, 0]),
     ) as Record<Budget, number>;
     for (const row of grouped) budgets[row.budget as Budget] = Number(row.n);
-    const stats = this.db.prepare("SELECT count(*) total,count(DISTINCT industry) industries,sum(CASE WHEN score>=70 THEN 1 ELSE 0 END) high_priority,sum(CASE WHEN coalesce(json_extract(data,'$.email'),'')!='' OR coalesce(json_extract(data,'$.phone'),'')!='' THEN 1 ELSE 0 END) contactable FROM leads WHERE workspace=?").get(workspace)!;
-    const leads=rows.map(hydrate);
-    const contacts=this.db.prepare("SELECT id,lead_id AS leadId,kind,value,source_url AS sourceUrl,found_at AS foundAt,status,e164,phone_type AS phoneType FROM public_contacts WHERE lead_id IN (SELECT value FROM json_each(?))").all(JSON.stringify(leads.map(l=>l.id))) as unknown as PublicContact[];
-    const byLead=new Map<string,PublicContact[]>();for(const contact of contacts)byLead.set(contact.leadId,[...(byLead.get(contact.leadId)||[]),contact]);
-    const suppressed=new Set(this.db.prepare("SELECT email FROM suppressions").all().map(row=>row.email as string));
-    for(const lead of leads){lead.contacts=byLead.get(lead.id)||[];lead.emailSuppressed=suppressed.has(lead.email.toLowerCase());}
+    const stats = this.db
+      .prepare(
+        "SELECT count(*) total,count(DISTINCT industry) industries,sum(CASE WHEN score>=70 THEN 1 ELSE 0 END) high_priority,sum(CASE WHEN coalesce(json_extract(data,'$.email'),'')!='' OR coalesce(json_extract(data,'$.phone'),'')!='' THEN 1 ELSE 0 END) contactable FROM leads WHERE workspace=?",
+      )
+      .get(workspace)!;
+    const leads = rows.map(hydrate);
+    const contacts = this.db
+      .prepare(
+        "SELECT id,lead_id AS leadId,kind,value,source_url AS sourceUrl,found_at AS foundAt,status,e164,phone_type AS phoneType FROM public_contacts WHERE lead_id IN (SELECT value FROM json_each(?))",
+      )
+      .all(
+        JSON.stringify(leads.map((l) => l.id)),
+      ) as unknown as PublicContact[];
+    const byLead = new Map<string, PublicContact[]>();
+    for (const contact of contacts)
+      byLead.set(contact.leadId, [
+        ...(byLead.get(contact.leadId) || []),
+        contact,
+      ]);
+    const suppressed = new Set(
+      this.db
+        .prepare("SELECT email FROM suppressions")
+        .all()
+        .map((row) => row.email as string),
+    );
+    for (const lead of leads) {
+      lead.contacts = byLead.get(lead.id) || [];
+      lead.emailSuppressed = suppressed.has(lead.email.toLowerCase());
+    }
     return {
       leads,
       total,
@@ -524,64 +582,377 @@ export class Repository {
         .get(new Date().toISOString().slice(0, 7))!.spent,
     );
   }
-  addContact(leadId:string, contact:{kind:"email"|"phone";value:string;sourceUrl:string;status?:string;e164?:string;phoneType?:string}) {
-    const value=contact.kind==="email"?contact.value.trim().toLowerCase():contact.value.trim();
-    this.db.prepare("INSERT INTO public_contacts VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(lead_id,kind,value) DO UPDATE SET source_url=CASE WHEN excluded.source_url!='' THEN excluded.source_url ELSE public_contacts.source_url END,found_at=excluded.found_at,status=CASE WHEN excluded.status='publicly_listed' THEN excluded.status ELSE public_contacts.status END,e164=CASE WHEN excluded.e164!='' THEN excluded.e164 ELSE public_contacts.e164 END").run(randomUUID(),leadId,contact.kind,value,contact.sourceUrl,new Date().toISOString(),contact.status||"publicly_listed",contact.e164||"",contact.phoneType||"unknown");
+  addContact(
+    leadId: string,
+    contact: {
+      kind: "email" | "phone";
+      value: string;
+      sourceUrl: string;
+      status?: string;
+      e164?: string;
+      phoneType?: string;
+    },
+  ) {
+    const value =
+      contact.kind === "email"
+        ? contact.value.trim().toLowerCase()
+        : contact.value.trim();
+    this.db
+      .prepare(
+        "INSERT INTO public_contacts VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(lead_id,kind,value) DO UPDATE SET source_url=CASE WHEN excluded.source_url!='' THEN excluded.source_url ELSE public_contacts.source_url END,found_at=excluded.found_at,status=CASE WHEN excluded.status='publicly_listed' THEN excluded.status ELSE public_contacts.status END,e164=CASE WHEN excluded.e164!='' THEN excluded.e164 ELSE public_contacts.e164 END",
+      )
+      .run(
+        randomUUID(),
+        leadId,
+        contact.kind,
+        value,
+        contact.sourceUrl,
+        new Date().toISOString(),
+        contact.status || "publicly_listed",
+        contact.e164 || "",
+        contact.phoneType || "unknown",
+      );
   }
-  contacts(leadId:string):PublicContact[] {return this.db.prepare("SELECT id,lead_id AS leadId,kind,value,source_url AS sourceUrl,found_at AS foundAt,status,e164,phone_type AS phoneType FROM public_contacts WHERE lead_id=? ORDER BY kind,value").all(leadId) as unknown as PublicContact[];}
-  enrichLead(leadId:string, patch:{website?:string;emails:{value:string;sourceUrl:string}[];phones:{value:string;sourceUrl:string;e164?:string}[];notes:string;sourceUrl:string}) {
-    const lead=this.getLead(leadId,"live"); if(!lead)throw new Error("Live lead not found.");
-    const data={...lead,website:patch.website||lead.website,email:lead.email||patch.emails[0]?.value||"",phone:lead.phone||patch.phones[0]?.value||""};
+  contacts(leadId: string): PublicContact[] {
+    return this.db
+      .prepare(
+        "SELECT id,lead_id AS leadId,kind,value,source_url AS sourceUrl,found_at AS foundAt,status,e164,phone_type AS phoneType FROM public_contacts WHERE lead_id=? ORDER BY kind,value",
+      )
+      .all(leadId) as unknown as PublicContact[];
+  }
+  enrichLead(
+    leadId: string,
+    patch: {
+      website?: string;
+      emails: { value: string; sourceUrl: string }[];
+      phones: { value: string; sourceUrl: string; e164?: string }[];
+      notes: string;
+      sourceUrl: string;
+    },
+  ) {
+    const lead = this.getLead(leadId, "live");
+    if (!lead) throw new Error("Live lead not found.");
+    const data = {
+      ...lead,
+      website: patch.website || lead.website,
+      email: lead.email || patch.emails[0]?.value || "",
+      phone: lead.phone || patch.phones[0]?.value || "",
+    };
     delete data.contacts;
-    const evidence=[...lead.evidence,{sourceName:"Public business website research",sourceUrl:patch.sourceUrl,observedAt:new Date().toISOString(),detail:patch.notes}].slice(-40);
+    const evidence = [
+      ...lead.evidence,
+      {
+        sourceName: "Public business website research",
+        sourceUrl: patch.sourceUrl,
+        observedAt: new Date().toISOString(),
+        detail: patch.notes,
+      },
+    ].slice(-40);
     this.db.exec("BEGIN IMMEDIATE");
-    try{
-      for(const email of patch.emails)this.addContact(leadId,{kind:"email",...email});
-      for(const phone of patch.phones)this.addContact(leadId,{kind:"phone",...phone});
-      this.db.prepare("UPDATE leads SET data=?,score=?,evidence=?,updated_at=? WHERE id=?").run(JSON.stringify({...data,score:scoreLead(data)}),scoreLead(data),JSON.stringify(evidence),new Date().toISOString(),leadId);
-      this.db.exec("COMMIT");return this.getLead(leadId,"live")!;
-    }catch(error){this.db.exec("ROLLBACK");throw error;}
+    try {
+      for (const email of patch.emails)
+        this.addContact(leadId, { kind: "email", ...email });
+      for (const phone of patch.phones)
+        this.addContact(leadId, { kind: "phone", ...phone });
+      this.db
+        .prepare(
+          "UPDATE leads SET data=?,score=?,evidence=?,updated_at=? WHERE id=?",
+        )
+        .run(
+          JSON.stringify({ ...data, score: scoreLead(data) }),
+          scoreLead(data),
+          JSON.stringify(evidence),
+          new Date().toISOString(),
+          leadId,
+        );
+      this.db.exec("COMMIT");
+      return this.getLead(leadId, "live")!;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
-  cacheGet<T>(key:string):T|null {const row=this.db.prepare("SELECT data FROM app_cache WHERE cache_key=? AND expires_at>?").get(key,new Date().toISOString());return row?JSON.parse(row.data as string):null;}
-  cacheSet(key:string,data:unknown,ttlSeconds=86400) {this.db.prepare("INSERT INTO app_cache VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET data=excluded.data,expires_at=excluded.expires_at").run(key,JSON.stringify(data),new Date(Date.now()+ttlSeconds*1000).toISOString());}
-  acquireLock(key:string,milliseconds:number) {
-    const now=Date.now();
-    return this.db.prepare("INSERT INTO app_locks VALUES(?,?) ON CONFLICT(lock_key) DO UPDATE SET expires_at=excluded.expires_at WHERE app_locks.expires_at<=?").run(key,now+milliseconds,now).changes>0;
+  cacheGet<T>(key: string): T | null {
+    const row = this.db
+      .prepare("SELECT data FROM app_cache WHERE cache_key=? AND expires_at>?")
+      .get(key, new Date().toISOString());
+    return row ? JSON.parse(row.data as string) : null;
   }
-  queueJob(kind:string,payload:Record<string,unknown>) {const id=randomUUID(),now=new Date().toISOString();this.db.prepare("INSERT INTO work_jobs VALUES(?,?,?,?,?,?,?,?,?,?)").run(id,kind,"queued",JSON.stringify(payload),0,0,"Waiting for collection worker",null,now,now);return id;}
-  claimJob():WorkJob|null {
-    this.db.exec("BEGIN IMMEDIATE");try{
-      this.db.prepare("UPDATE work_jobs SET status='interrupted',message='Worker stopped. Completed records remain; re-run explicitly to continue.',updated_at=? WHERE status='running' AND updated_at<?").run(new Date().toISOString(),new Date(Date.now()-180000).toISOString());
-      if(this.db.prepare("SELECT 1 FROM work_jobs WHERE status='running' LIMIT 1").get()){this.db.exec("COMMIT");return null;}
-      const row=this.db.prepare("SELECT * FROM work_jobs WHERE status='queued' ORDER BY created_at LIMIT 1").get();
-      if(!row){this.db.exec("COMMIT");return null;}
-      this.db.prepare("UPDATE work_jobs SET status='running',updated_at=? WHERE id=? AND status='queued'").run(new Date().toISOString(),row.id as string);
-      this.db.exec("COMMIT");return this.job(row.id as string);
-    }catch(error){this.db.exec("ROLLBACK");throw error;}
+  cacheSet(key: string, data: unknown, ttlSeconds = 86400) {
+    this.db
+      .prepare(
+        "INSERT INTO app_cache VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET data=excluded.data,expires_at=excluded.expires_at",
+      )
+      .run(
+        key,
+        JSON.stringify(data),
+        new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+      );
   }
-  job(id:string):WorkJob|null {const row=this.db.prepare("SELECT * FROM work_jobs WHERE id=?").get(id);return row?{...row,payload:JSON.parse(row.payload as string),result:row.result?JSON.parse(row.result as string):null,createdAt:row.created_at,updatedAt:row.updated_at} as unknown as WorkJob:null;}
-  jobs():WorkJob[] {return this.db.prepare("SELECT id FROM work_jobs ORDER BY created_at DESC LIMIT 30").all().map(row=>this.job(row.id as string)!);}
-  updateJob(id:string,patch:{status?:string;progress?:number;total?:number;message?:string;result?:unknown}) {const current=this.job(id);if(!current)return;this.db.prepare("UPDATE work_jobs SET status=?,progress=?,total=?,message=?,result=?,updated_at=? WHERE id=?").run(patch.status||current.status,patch.progress??current.progress,patch.total??current.total,patch.message??current.message,JSON.stringify(patch.result??current.result),new Date().toISOString(),id);}
-  isSuppressed(email:string) {return Boolean(this.db.prepare("SELECT 1 FROM suppressions WHERE email=?").get(email.trim().toLowerCase()));}
-  suppress(email:string,reason:string) {this.db.prepare("INSERT INTO suppressions VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET reason=excluded.reason").run(email.trim().toLowerCase(),reason,new Date().toISOString());}
-  reviewContact(leadId:string,email:string,note:string) {this.db.prepare("INSERT INTO contact_reviews VALUES(?,?,?,?,?) ON CONFLICT(lead_id,email) DO UPDATE SET note=excluded.note,reviewed_at=excluded.reviewed_at,expires_at=excluded.expires_at").run(leadId,email.toLowerCase(),note,new Date().toISOString(),new Date(Date.now()+7*86400000).toISOString());}
-  hasContactReview(leadId:string,email:string) {return Boolean(this.db.prepare("SELECT 1 FROM contact_reviews WHERE lead_id=? AND email=? AND expires_at>?").get(leadId,email.toLowerCase(),new Date().toISOString()));}
-  messages():OutboundMessage[] {return this.db.prepare("SELECT id,lead_id AS leadId,recipient,subject,body,status,provider_id AS providerId,error,created_at AS createdAt,sent_at AS sentAt FROM outbound_messages ORDER BY created_at DESC LIMIT 200").all() as unknown as OutboundMessage[];}
-  reserveMessage(input:{id:string;leadId:string;recipient:string;subject:string;body:string},dailyLimit:number) {
-    this.db.exec("BEGIN IMMEDIATE");try{
-      const existing=this.db.prepare("SELECT * FROM outbound_messages WHERE id=?").get(input.id);
-      if(existing){this.db.exec("COMMIT");return {created:false,status:String(existing.status)};}
-      const hash=createHash("sha256").update(JSON.stringify([input.recipient.toLowerCase(),input.subject,input.body])).digest("hex");
-      if(this.isSuppressed(input.recipient))throw new Error("Recipient is on your do-not-contact list.");
-      if(this.db.prepare("SELECT 1 FROM outbound_messages WHERE content_hash=? AND status IN ('dispatching','accepted','uncertain') AND created_at>?").get(hash,new Date(Date.now()-86400000).toISOString()))throw new Error("This message was already submitted or has uncertain delivery. Check send history before retrying.");
-      const count=Number(this.db.prepare("SELECT count(*) n FROM outbound_messages WHERE created_at>=? AND status IN ('dispatching','accepted','uncertain')").get(new Date().toISOString().slice(0,10))!.n);
-      if(count>=dailyLimit)throw new Error("Daily sending limit reached.");
-      this.db.prepare("INSERT INTO outbound_messages(id,lead_id,recipient,subject,body,content_hash,status,created_at) VALUES(?,?,?,?,?,?,?,?)").run(input.id,input.leadId,input.recipient.toLowerCase(),input.subject,input.body,hash,"dispatching",new Date().toISOString());
-      this.db.exec("COMMIT");return {created:true,status:"dispatching"};
-    }catch(error){this.db.exec("ROLLBACK");throw error;}
+  acquireLock(key: string, milliseconds: number) {
+    const now = Date.now();
+    return (
+      this.db
+        .prepare(
+          "INSERT INTO app_locks VALUES(?,?) ON CONFLICT(lock_key) DO UPDATE SET expires_at=excluded.expires_at WHERE app_locks.expires_at<=?",
+        )
+        .run(key, now + milliseconds, now).changes > 0
+    );
   }
-  finishMessage(id:string,status:string,providerId="",error="") {this.db.prepare("UPDATE outbound_messages SET status=?,provider_id=?,error=?,sent_at=? WHERE id=?").run(status,providerId,error,status==="accepted"?new Date().toISOString():null,id);}
-  takeQuota(key:string,maximum:number) {const result=this.db.prepare("INSERT INTO usage_counters VALUES(?,1) ON CONFLICT(counter_key) DO UPDATE SET amount=amount+1 WHERE usage_counters.amount<?").run(key,maximum);if(!result.changes)throw new Error("This provider's configured request quota has been reached.");}
+  queueJob(kind: string, payload: Record<string, unknown>) {
+    const id = randomUUID(),
+      now = new Date().toISOString();
+    this.db
+      .prepare("INSERT INTO work_jobs VALUES(?,?,?,?,?,?,?,?,?,?)")
+      .run(
+        id,
+        kind,
+        "queued",
+        JSON.stringify(payload),
+        0,
+        0,
+        "Waiting for collection worker",
+        null,
+        now,
+        now,
+      );
+    return id;
+  }
+  claimJob(): WorkJob | null {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(
+          "UPDATE work_jobs SET status='interrupted',message='Worker stopped. Completed records remain; re-run explicitly to continue.',updated_at=? WHERE status='running' AND updated_at<?",
+        )
+        .run(
+          new Date().toISOString(),
+          new Date(Date.now() - 180000).toISOString(),
+        );
+      if (
+        this.db
+          .prepare("SELECT 1 FROM work_jobs WHERE status='running' LIMIT 1")
+          .get()
+      ) {
+        this.db.exec("COMMIT");
+        return null;
+      }
+      const row = this.db
+        .prepare(
+          "SELECT * FROM work_jobs WHERE status='queued' ORDER BY created_at LIMIT 1",
+        )
+        .get();
+      if (!row) {
+        this.db.exec("COMMIT");
+        return null;
+      }
+      this.db
+        .prepare(
+          "UPDATE work_jobs SET status='running',updated_at=? WHERE id=? AND status='queued'",
+        )
+        .run(new Date().toISOString(), row.id as string);
+      this.db.exec("COMMIT");
+      return this.job(row.id as string);
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  job(id: string): WorkJob | null {
+    const row = this.db.prepare("SELECT * FROM work_jobs WHERE id=?").get(id);
+    return row
+      ? ({
+          ...row,
+          payload: JSON.parse(row.payload as string),
+          result: row.result ? JSON.parse(row.result as string) : null,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        } as unknown as WorkJob)
+      : null;
+  }
+  jobs(): WorkJob[] {
+    return this.db
+      .prepare("SELECT id FROM work_jobs ORDER BY created_at DESC LIMIT 30")
+      .all()
+      .map((row) => this.job(row.id as string)!);
+  }
+  updateJob(
+    id: string,
+    patch: {
+      status?: string;
+      progress?: number;
+      total?: number;
+      message?: string;
+      result?: unknown;
+    },
+  ) {
+    const current = this.job(id);
+    if (!current) return;
+    this.db
+      .prepare(
+        "UPDATE work_jobs SET status=?,progress=?,total=?,message=?,result=?,updated_at=? WHERE id=?",
+      )
+      .run(
+        patch.status || current.status,
+        patch.progress ?? current.progress,
+        patch.total ?? current.total,
+        patch.message ?? current.message,
+        JSON.stringify(patch.result ?? current.result),
+        new Date().toISOString(),
+        id,
+      );
+  }
+  isSuppressed(email: string) {
+    return Boolean(
+      this.db
+        .prepare("SELECT 1 FROM suppressions WHERE email=?")
+        .get(email.trim().toLowerCase()),
+    );
+  }
+  suppress(email: string, reason: string) {
+    this.db
+      .prepare(
+        "INSERT INTO suppressions VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET reason=excluded.reason",
+      )
+      .run(email.trim().toLowerCase(), reason, new Date().toISOString());
+  }
+  reviewContact(leadId: string, email: string, note: string) {
+    this.db
+      .prepare(
+        "INSERT INTO contact_reviews VALUES(?,?,?,?,?) ON CONFLICT(lead_id,email) DO UPDATE SET note=excluded.note,reviewed_at=excluded.reviewed_at,expires_at=excluded.expires_at",
+      )
+      .run(
+        leadId,
+        email.toLowerCase(),
+        note,
+        new Date().toISOString(),
+        new Date(Date.now() + 7 * 86400000).toISOString(),
+      );
+  }
+  hasContactReview(leadId: string, email: string) {
+    return Boolean(
+      this.db
+        .prepare(
+          "SELECT 1 FROM contact_reviews WHERE lead_id=? AND email=? AND expires_at>?",
+        )
+        .get(leadId, email.toLowerCase(), new Date().toISOString()),
+    );
+  }
+  messages(): OutboundMessage[] {
+    return this.db
+      .prepare(
+        "SELECT id,lead_id AS leadId,recipient,subject,body,status,provider_id AS providerId,error,created_at AS createdAt,sent_at AS sentAt FROM outbound_messages ORDER BY created_at DESC LIMIT 200",
+      )
+      .all() as unknown as OutboundMessage[];
+  }
+  reserveMessage(
+    input: {
+      id: string;
+      leadId: string;
+      recipient: string;
+      subject: string;
+      body: string;
+    },
+    dailyLimit: number,
+  ) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.db
+        .prepare("SELECT * FROM outbound_messages WHERE id=?")
+        .get(input.id);
+      if (existing) {
+        this.db.exec("COMMIT");
+        return { created: false, status: String(existing.status) };
+      }
+      const hash = createHash("sha256")
+        .update(
+          JSON.stringify([
+            input.recipient.toLowerCase(),
+            input.subject,
+            input.body,
+          ]),
+        )
+        .digest("hex");
+      if (this.isSuppressed(input.recipient))
+        throw new Error("Recipient is on your do-not-contact list.");
+      if (
+        this.db
+          .prepare(
+            "SELECT 1 FROM outbound_messages WHERE recipient=? AND status IN ('dispatching','uncertain') AND created_at>?",
+          )
+          .get(
+            input.recipient.toLowerCase(),
+            new Date(Date.now() - 86400000).toISOString(),
+          )
+      )
+        throw new Error(
+          "A previous submission to this recipient is still dispatching or uncertain. Check provider logs before another message.",
+        );
+      if (
+        this.db
+          .prepare(
+            "SELECT 1 FROM outbound_messages WHERE content_hash=? AND status IN ('dispatching','accepted','uncertain') AND created_at>?",
+          )
+          .get(hash, new Date(Date.now() - 86400000).toISOString())
+      )
+        throw new Error(
+          "This message was already submitted or has uncertain delivery. Check send history before retrying.",
+        );
+      const count = Number(
+        this.db
+          .prepare(
+            "SELECT count(*) n FROM outbound_messages WHERE created_at>=? AND status IN ('dispatching','accepted','uncertain')",
+          )
+          .get(new Date().toISOString().slice(0, 10))!.n,
+      );
+      if (count >= dailyLimit) throw new Error("Daily sending limit reached.");
+      this.db
+        .prepare(
+          "INSERT INTO outbound_messages(id,lead_id,recipient,subject,body,content_hash,status,created_at) VALUES(?,?,?,?,?,?,?,?)",
+        )
+        .run(
+          input.id,
+          input.leadId,
+          input.recipient.toLowerCase(),
+          input.subject,
+          input.body,
+          hash,
+          "dispatching",
+          new Date().toISOString(),
+        );
+      this.db.exec("COMMIT");
+      return { created: true, status: "dispatching" };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  finishMessage(id: string, status: string, providerId = "", error = "") {
+    this.db
+      .prepare(
+        "UPDATE outbound_messages SET status=?,provider_id=?,error=?,sent_at=? WHERE id=?",
+      )
+      .run(
+        status,
+        providerId,
+        error,
+        status === "accepted" ? new Date().toISOString() : null,
+        id,
+      );
+  }
+  takeQuota(key: string, maximum: number) {
+    if (!Number.isFinite(maximum) || maximum < 1)
+      throw new Error("Provider request quota is disabled or invalid.");
+    const result = this.db
+      .prepare(
+        "INSERT INTO usage_counters VALUES(?,1) ON CONFLICT(counter_key) DO UPDATE SET amount=amount+1 WHERE usage_counters.amount<?",
+      )
+      .run(key, maximum);
+    if (!result.changes)
+      throw new Error(
+        "This provider's configured request quota has been reached.",
+      );
+  }
 }
 function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);

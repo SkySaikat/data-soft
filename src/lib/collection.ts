@@ -266,11 +266,14 @@ export async function collectDirectory(input: {
     robotsUrl,
     robots.status === 200 ? robots.text : "",
   );
-  if (policy.isAllowed(url.href, "DataSoftResearch") === false)
+  if (policy.isAllowed(url.href, "DataSoftLocalResearch") === false)
     throw new Error(
       "This source's robots directives disallow this collection path.",
     );
-  const crawlDelay = Math.max(2, policy.getCrawlDelay("DataSoftResearch") || 0);
+  const crawlDelay = Math.max(
+    2,
+    policy.getCrawlDelay("DataSoftLocalResearch") || 0,
+  );
   if (crawlDelay > 10)
     throw new Error(
       "This source requires a longer crawl delay. Use an export until background collection workers are available.",
@@ -328,7 +331,9 @@ export function exportLeadsCsv(leads: LeadInput[]) {
           budget_evidence: l.budgetEvidence.join("|"),
           source_name: l.sourceName,
           source_url: l.sourceUrl,
-          source_license: l.sourceName.startsWith("OpenStreetMap") ? "© OpenStreetMap contributors; ODbL 1.0; https://www.openstreetmap.org/copyright" : "Check source-specific reuse terms",
+          source_license: l.sourceName.startsWith("OpenStreetMap")
+            ? "© OpenStreetMap contributors; ODbL 1.0; https://www.openstreetmap.org/copyright"
+            : "Check source-specific reuse terms",
           notes: l.notes,
         }).map(([k, v]) => [k, csvCell(v)]),
       ),

@@ -39,10 +39,31 @@ export async function safeFetch(
   maxBytes = 2_000_000,
   redirects = 0,
   allowedOrigin?: string,
-  options: { headers?: Record<string,string>; timeoutMs?: number; allowWebsiteRedirects?: boolean } = {},
-): Promise<{ text: string; body: Buffer; url: string; status: number; contentType: string }> {
+  options: {
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+    allowWebsiteRedirects?: boolean;
+    method?: "GET" | "POST";
+    body?: string;
+  } = {},
+): Promise<{
+  text: string;
+  body: Buffer;
+  url: string;
+  status: number;
+  contentType: string;
+}> {
   const url = validateRemoteUrl(value);
-  if (allowedOrigin && url.origin !== allowedOrigin && !(options.allowWebsiteRedirects && url.hostname.replace(/^www\./,"") === new URL(allowedOrigin).hostname.replace(/^www\./,"") && !url.port))
+  if (
+    allowedOrigin &&
+    url.origin !== allowedOrigin &&
+    !(
+      options.allowWebsiteRedirects &&
+      url.hostname.replace(/^www\./, "") ===
+        new URL(allowedOrigin).hostname.replace(/^www\./, "") &&
+      !url.port
+    )
+  )
     throw new Error(
       "This source redirects to another origin. Review that source before collection.",
     );
@@ -54,18 +75,20 @@ export async function safeFetch(
     throw new Error("The source resolves to a restricted network address.");
   const address = addresses[0];
   return new Promise((resolve, reject) => {
-    const request = (url.protocol === "https:" ? https : http).get(
+    const request = (url.protocol === "https:" ? https : http).request(
       url,
       {
         agent: false,
+        method:options.method||"GET",
         lookup: (_hostname, options, callback) =>
           options.all
             ? callback(null, addresses)
             : callback(null, address.address, address.family),
         headers: {
-          "User-Agent": "DataSoftLocalResearch/0.2",
+          "User-Agent": process.env.RESEARCH_USER_AGENT || "DataSoftLocalResearch/0.2 (+https://github.com/SkySaikat/data-soft)",
           Accept: "text/html, application/json, text/plain",
           "Accept-Encoding": "identity",
+          ...(options.body?{"Content-Length":String(Buffer.byteLength(options.body))}:{}),
           ...options.headers,
         },
       },
@@ -122,5 +145,6 @@ export async function safeFetch(
       request.destroy(new Error("Source timed out. Try again later.")),
     );
     request.on("error", reject);
+    request.end(options.body);
   });
 }

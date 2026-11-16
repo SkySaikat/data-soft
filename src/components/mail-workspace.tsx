@@ -1,24 +1,498 @@
 "use client";
-import { useEffect,useState } from "react";
-import { CheckCircle2,Info,LoaderCircle,Mail,Phone,Send,ShieldCheck } from "lucide-react";
-import type { Lead,OutboundMessage } from "@/lib/domain";
-import { api,post } from "@/lib/client-api";
+import { useEffect, useState } from "react";
+import {
+  CheckCircle2,
+  Info,
+  LoaderCircle,
+  Mail,
+  Phone,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
+import type { Lead, OutboundMessage } from "@/lib/domain";
+import { api, post } from "@/lib/client-api";
 import { Dialog } from "./dialog";
-export type MailConfig={ready:boolean;from:string;replyTo:string;agency:string;postalAddress:string;host:string;port:number;dailyLimit:number;missing:string[]};
+export type MailConfig = {
+  ready: boolean;
+  from: string;
+  replyTo: string;
+  agency: string;
+  postalAddress: string;
+  host: string;
+  port: number;
+  dailyLimit: number;
+  missing: string[];
+};
 
-export function ComposeEmail({lead,onClose,initialBody=""}:{lead:Lead;onClose:()=>void;initialBody?:string}){
-  const [config,setConfig]=useState<MailConfig|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[result,setResult]=useState<{status:string;message:string}|null>(null),[requestId,setRequestId]=useState(()=>crypto.randomUUID());
-  useEffect(()=>{let active=true;api<{config:MailConfig}>("mail").then(data=>{if(active)setConfig(data.config);}).catch(error=>setError(error.message));return()=>{active=false;};},[]);
-  const emails=[...new Set([lead.email,...(lead.contacts||[]).filter(c=>c.kind==="email").map(c=>c.value)].filter(Boolean))];
-  async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();setBusy(true);setError("");const fields=Object.fromEntries(new FormData(event.currentTarget));try{setResult(await api("mail-send",post({...fields,id:requestId,leadId:lead.id,reviewed:fields.reviewed==="on"})));}catch(error){setError((error as Error).message);}finally{setBusy(false);}}
-  return <Dialog title={`Email ${lead.name}`} onClose={onClose} wide><div className="dialog-body"><p className="muted">One reviewed message from your configured SMTP account. No attachments, tracking pixels, campaigns, or automatic follow-ups.</p>{config&&!config.ready?<div className="info-box compact"><Info size={18}/><div><strong>Connect your email sender first</strong><p>Configure SMTP credentials, agency identity/address and channel confirmations in .env.local, then restart. Open Email & calling settings for the exact fields.</p></div></div>:null}{lead.workspace==="demo"?<p className="form-error">Fictional sample businesses cannot receive email.</p>:null}{result?<div className="send-result"><CheckCircle2 size={25}/><h3>{result.status==="accepted"?"Accepted by your mail server":result.status==="uncertain"?"Submission needs reconciliation":"Submission result"}</h3><p>{result.message}</p><span className="gray-pill">{result.status}</span><button className="button secondary" onClick={onClose}>Close</button></div>:<form onSubmit={submit} onChange={()=>setRequestId(crypto.randomUUID())}><div className="form-grid"><label className="field full">To · recorded business contact<select name="recipient" required defaultValue={emails[0]||""}>{emails.length?emails.map(email=><option key={email}>{email}</option>):<option value="">No business email recorded</option>}</select></label><label className="field full">Subject<input name="subject" required minLength={3} maxLength={200} defaultValue={`A website and marketing idea for ${lead.name}`}/></label><label className="field full">Message<textarea name="body" required minLength={20} maxLength={12000} rows={9} defaultValue={initialBody} placeholder="Write a relevant, truthful introduction. Replace all template placeholders."/></label><label className="field full">Contact/relevance review note<input name="reviewNote" required minLength={10} maxLength={1000} placeholder="How you checked the business contact and why this offer is relevant"/></label></div><div className="mail-footer-preview"><strong>Added automatically to every email</strong><p>{config?.agency||"Your agency"}<br/>{config?.postalAddress||"Your valid physical postal address"}<br/>Business advertisement for our agency services.<br/>To stop future marketing emails, reply “unsubscribe” to {config?.replyTo||"your monitored reply address"}.</p></div><label className="consent"><input type="checkbox" name="reviewed" required/><span>I reviewed this recipient, the final message, relevance and contact eligibility. Public listing and DNS checks do not guarantee mailbox validity, consent, or inbox placement.</span></label>{error?<p className="form-error" role="alert">{error}</p>:null}<div className="dialog-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" disabled={busy||!config?.ready||!emails.length||lead.workspace!=="live"||lead.emailSuppressed}>{busy?<LoaderCircle size={16} className="spin"/>:<Send size={16}/>}Review complete · send email</button></div></form>}</div></Dialog>;
+export function ComposeEmail({
+  lead,
+  onClose,
+  initialBody = "",
+}: {
+  lead: Lead;
+  onClose: () => void;
+  initialBody?: string;
+}) {
+  const [config, setConfig] = useState<MailConfig | null>(null),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [result, setResult] = useState<{ status: string; message: string } | null>(
+      null,
+    ),
+    [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  useEffect(() => {
+    let active = true;
+    api<{ config: MailConfig }>("mail")
+      .then((data) => {
+        if (active) setConfig(data.config);
+      })
+      .catch((error) => setError(error.message));
+    return () => {
+      active = false;
+    };
+  }, []);
+  const emails = [
+    ...new Set(
+      [
+        lead.email,
+        ...(lead.contacts || [])
+          .filter((c) => c.kind === "email")
+          .map((c) => c.value),
+      ].filter(Boolean),
+    ),
+  ];
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const fields = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      setResult(
+        await api(
+          "mail-send",
+          post({
+            ...fields,
+            id: requestId,
+            leadId: lead.id,
+            reviewed: fields.reviewed === "on",
+          }),
+        ),
+      );
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog title={`Email ${lead.name}`} onClose={onClose} wide>
+      <div className="dialog-body">
+        <p className="muted">
+          One reviewed message from your configured SMTP account. No
+          attachments, tracking pixels, campaigns, or automatic follow-ups.
+        </p>
+        {config && !config.ready ? (
+          <div className="info-box compact">
+            <Info size={18} />
+            <div>
+              <strong>Connect your email sender first</strong>
+              <p>
+                Configure SMTP credentials, agency identity/address and channel
+                confirmations in .env.local, then restart. Open Email & calling
+                settings for the exact fields.
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {lead.workspace === "demo" ? (
+          <p className="form-error">
+            Fictional sample businesses cannot receive email.
+          </p>
+        ) : null}
+        {result ? (
+          <div className="send-result">
+            <CheckCircle2 size={25} />
+            <h3>
+              {result.status === "accepted"
+                ? "Accepted by your mail server"
+                : result.status === "uncertain"
+                  ? "Submission needs reconciliation"
+                  : "Submission result"}
+            </h3>
+            <p>{result.message}</p>
+            <span className="gray-pill">{result.status}</span>
+            <button className="button secondary" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={submit}
+            onChange={() => setRequestId(crypto.randomUUID())}
+          >
+            <div className="form-grid">
+              <label className="field full">
+                To · recorded business contact
+                <select
+                  name="recipient"
+                  required
+                  defaultValue={emails[0] || ""}
+                >
+                  {emails.length ? (
+                    emails.map((email) => <option key={email}>{email}</option>)
+                  ) : (
+                    <option value="">No business email recorded</option>
+                  )}
+                </select>
+              </label>
+              <label className="field full">
+                Subject
+                <input
+                  name="subject"
+                  required
+                  minLength={3}
+                  maxLength={200}
+                  defaultValue={`A website and marketing idea for ${lead.name}`}
+                />
+              </label>
+              <label className="field full">
+                Message
+                <textarea
+                  name="body"
+                  required
+                  minLength={20}
+                  maxLength={12000}
+                  rows={9}
+                  defaultValue={initialBody}
+                  placeholder="Write a relevant, truthful introduction. Replace all template placeholders."
+                />
+              </label>
+              <label className="field full">
+                Contact/relevance review note
+                <input
+                  name="reviewNote"
+                  required
+                  minLength={10}
+                  maxLength={1000}
+                  placeholder="How you checked the business contact and why this offer is relevant"
+                />
+              </label>
+            </div>
+            <div className="mail-footer-preview">
+              <strong>Added automatically to every email</strong>
+              <p>
+                {config?.agency || "Your agency"}
+                <br />
+                {config?.postalAddress || "Your valid physical postal address"}
+                <br />
+                Business advertisement for our agency services.
+                <br />
+                To stop future marketing emails, reply “unsubscribe” to{" "}
+                {config?.replyTo || "your monitored reply address"}.
+              </p>
+            </div>
+            <label className="consent">
+              <input type="checkbox" name="reviewed" required />
+              <span>
+                I reviewed this recipient, the final message, relevance and
+                contact eligibility. Public listing and DNS checks do not
+                guarantee mailbox validity, consent, or inbox placement.
+              </span>
+            </label>
+            {error ? (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="button secondary"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                className="button primary"
+                disabled={
+                  busy ||
+                  !config?.ready ||
+                  !emails.length ||
+                  lead.workspace !== "live" ||
+                  lead.emailSuppressed
+                }
+              >
+                {busy ? (
+                  <LoaderCircle size={16} className="spin" />
+                ) : (
+                  <Send size={16} />
+                )}
+                Review complete · send email
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </Dialog>
+  );
 }
 
-export function MailWorkspace(){
-  const [config,setConfig]=useState<MailConfig|null>(null),[messages,setMessages]=useState<OutboundMessage[]>([]),[notice,setNotice]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
-  async function load(){try{const data=await api<{config:MailConfig;messages:OutboundMessage[]}>("mail");setConfig(data.config);setMessages(data.messages);}catch(error){setError((error as Error).message);}}
-  useEffect(()=>{void load();},[]);
-  async function verify(){setBusy(true);setError("");try{const result=await api<{message:string}>("mail-verify",post({}));setNotice(result.message);}catch(error){setError((error as Error).message);}finally{setBusy(false);}}
-  async function suppress(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget;setError("");try{const result=await api<{message:string}>("suppress",post(Object.fromEntries(new FormData(form))));setNotice(result.message);form.reset();}catch(error){setError((error as Error).message);}}
-  return <><div className="page-heading"><div><div className="eyebrow"><span/>RELEVANT CONVERSATIONS, WITH A CLEAR RECORD</div><h1>Email & calling<span className="title-dot">.</span></h1><p>Send reviewed business emails now. Keep public phone records ready for VoIP later.</p></div></div>{notice?<div className="info-box compact" role="status"><CheckCircle2 size={18}/><p>{notice}</p></div>:null}{error?<p role="alert" className="form-error">{error}</p>:null}<div className="two-column"><section className="panel"><div className="panel-heading"><span className="green-icon"><Mail size={21}/></span><h2>Your email sender</h2><span className={`source-status ${config?.ready?"green":"amber"}`}>{config?.ready?"Configured":"Setup needed"}</span></div><p className="muted">SMTP credentials stay on the server. Use a provider permitting your intended outreach, authenticated sender domain and a monitored reply mailbox.</p><dl className="settings-list"><div><dt>From</dt><dd>{config?.from||"Not configured"}</dd></div><div><dt>Reply address</dt><dd>{config?.replyTo||"Not configured"}</dd></div><div><dt>Daily application limit</dt><dd>{config?.dailyLimit||20} messages</dd></div><div><dt>Transport</dt><dd>TLS-required SMTP</dd></div></dl><button className="button secondary" disabled={!config?.ready||busy} onClick={()=>void verify()}>{busy?<LoaderCircle size={16} className="spin"/>:<ShieldCheck size={16}/>}Check SMTP connection</button><h3>Configure in .env.local</h3><pre className="code-block">SMTP_HOST=…{"\n"}SMTP_PORT=587{"\n"}SMTP_SECURE=false{"\n"}SMTP_USER=…{"\n"}SMTP_PASS=…{"\n"}SMTP_FROM=you@your-domain.com{"\n"}SMTP_REPLY_TO=you@your-domain.com{"\n"}AGENCY_NAME=…{"\n"}AGENCY_POSTAL_ADDRESS=…{"\n"}EMAIL_CHANNEL_APPROVED=true{"\n"}EMAIL_REPLY_MONITORING_CONFIRMED=true{"\n"}EMAIL_AUTHENTICATION_CONFIRMED=true{"\n"}EMAIL_DAILY_LIMIT=20</pre><p className="muted">Set confirmations only after checking the provider's allowed use, SPF/DKIM/DMARC setup and who monitors replies. Opt-out replies must be entered into the do-not-contact list promptly. This local app does not automatically read your mailbox.</p></section><div className="stack"><section className="panel"><div className="panel-heading"><span className="green-icon"><Phone size={21}/></span><h2>Future VoIP calling</h2></div><p>Public business phone numbers are normalized with their source links. Number type, consent and calling eligibility are recorded as unknown.</p><p className="muted">A later SIP/VoIP provider adapter will add a real number, a browser dialer, dispositions and calling-rule checks. No calls, SMS or recordings are enabled now.</p><span className="source-status gray">Contact data ready · calling not connected</span></section><section className="panel"><h2>Do-not-contact list</h2><p className="muted">Record unsubscribe replies, complaints and explicit requests here. Suppression applies across duplicate business records.</p><form onSubmit={suppress}><label className="field">Business email<input name="email" type="email" required placeholder="Email to suppress"/></label><label className="field">Reason<input name="reason" required minLength={3} maxLength={1000} placeholder="e.g. Unsubscribe reply received"/></label><button className="button secondary"><ShieldCheck size={16}/>Suppress future email</button></form></section></div></div><section className="panel runs-panel"><h2>Send history <span>{messages.length}</span></h2>{messages.length?<div className="table-scroll"><table><thead><tr><th>Recipient / subject</th><th>Submission status</th><th>Time</th><th>Details</th></tr></thead><tbody>{messages.map(message=><tr key={message.id}><td><strong>{message.recipient}</strong><small className="run-message">{message.subject}</small></td><td><span className={`source-status ${message.status==="accepted"?"green":message.status==="uncertain"?"amber":"gray"}`}>{message.status}</span></td><td>{new Date(message.createdAt).toLocaleString()}</td><td><details><summary>Message & provider result</summary><pre className="draft-text">{message.body}</pre><p>{message.error||message.providerId}</p></details></td></tr>)}</tbody></table></div>:<div className="small-empty"><Mail size={23}/><p>No messages sent. Open a live lead with a business email and choose Compose email.</p></div>}</section><div className="info-box"><Info size={18}/><p>Accepted means your SMTP server accepted submission. It does not mean inbox delivery. Ambiguous submissions are retained and duplicate retry requests are blocked.</p></div></>;
+export function MailWorkspace() {
+  const [config, setConfig] = useState<MailConfig | null>(null),
+    [messages, setMessages] = useState<OutboundMessage[]>([]),
+    [notice, setNotice] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  async function load() {
+    try {
+      const data = await api<{
+        config: MailConfig;
+        messages: OutboundMessage[];
+      }>("mail");
+      setConfig(data.config);
+      setMessages(data.messages);
+    } catch (error) {
+      setError((error as Error).message);
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  async function verify() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<{ message: string }>("mail-verify", post({}));
+      setNotice(result.message);
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function suppress(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setError("");
+    try {
+      const result = await api<{ message: string }>(
+        "suppress",
+        post(Object.fromEntries(new FormData(form))),
+      );
+      setNotice(result.message);
+      form.reset();
+    } catch (error) {
+      setError((error as Error).message);
+    }
+  }
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">
+            <span />
+            RELEVANT CONVERSATIONS, WITH A CLEAR RECORD
+          </div>
+          <h1>
+            Email & calling<span className="title-dot">.</span>
+          </h1>
+          <p>
+            Send reviewed business emails now. Keep public phone records ready
+            for VoIP later.
+          </p>
+        </div>
+      </div>
+      {notice ? (
+        <div className="info-box compact" role="status">
+          <CheckCircle2 size={18} />
+          <p>{notice}</p>
+        </div>
+      ) : null}
+      {error ? (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      ) : null}
+      <div className="two-column">
+        <section className="panel">
+          <div className="panel-heading">
+            <span className="green-icon">
+              <Mail size={21} />
+            </span>
+            <h2>Your email sender</h2>
+            <span
+              className={`source-status ${config?.ready ? "green" : "amber"}`}
+            >
+              {config?.ready ? "Configured" : "Setup needed"}
+            </span>
+          </div>
+          <p className="muted">
+            SMTP credentials stay on the server. Use a provider permitting your
+            intended outreach, authenticated sender domain and a monitored reply
+            mailbox.
+          </p>
+          <dl className="settings-list">
+            <div>
+              <dt>From</dt>
+              <dd>{config?.from || "Not configured"}</dd>
+            </div>
+            <div>
+              <dt>Reply address</dt>
+              <dd>{config?.replyTo || "Not configured"}</dd>
+            </div>
+            <div>
+              <dt>Daily application limit</dt>
+              <dd>{config?.dailyLimit || 20} messages</dd>
+            </div>
+            <div>
+              <dt>Transport</dt>
+              <dd>TLS-required SMTP</dd>
+            </div>
+          </dl>
+          <button
+            className="button secondary"
+            disabled={!config?.ready || busy}
+            onClick={() => void verify()}
+          >
+            {busy ? (
+              <LoaderCircle size={16} className="spin" />
+            ) : (
+              <ShieldCheck size={16} />
+            )}
+            Check SMTP connection
+          </button>
+          <h3>Configure in .env.local</h3>
+          <pre className="code-block">
+            SMTP_HOST=…{"\n"}SMTP_PORT=587{"\n"}SMTP_SECURE=false{"\n"}
+            SMTP_USER=…{"\n"}SMTP_PASS=…{"\n"}SMTP_FROM=you@your-domain.com
+            {"\n"}SMTP_REPLY_TO=you@your-domain.com{"\n"}AGENCY_NAME=…{"\n"}
+            AGENCY_POSTAL_ADDRESS=…{"\n"}EMAIL_CHANNEL_APPROVED=true{"\n"}
+            EMAIL_REPLY_MONITORING_CONFIRMED=true{"\n"}
+            EMAIL_AUTHENTICATION_CONFIRMED=true{"\n"}EMAIL_DAILY_LIMIT=20
+          </pre>
+          <p className="muted">
+            Set confirmations only after checking the provider's allowed use,
+            SPF/DKIM/DMARC setup and who monitors replies. Opt-out replies must
+            be entered into the do-not-contact list promptly. This local app
+            does not automatically read your mailbox.
+          </p>
+        </section>
+        <div className="stack">
+          <section className="panel">
+            <div className="panel-heading">
+              <span className="green-icon">
+                <Phone size={21} />
+              </span>
+              <h2>Future VoIP calling</h2>
+            </div>
+            <p>
+              Public business phone numbers are normalized with their source
+              links. Number type, consent and calling eligibility are recorded
+              as unknown.
+            </p>
+            <p className="muted">
+              A later SIP/VoIP provider adapter will add a real number, a
+              browser dialer, dispositions and calling-rule checks. No calls,
+              SMS or recordings are enabled now.
+            </p>
+            <span className="source-status gray">
+              Contact data ready · calling not connected
+            </span>
+          </section>
+          <section className="panel">
+            <h2>Do-not-contact list</h2>
+            <p className="muted">
+              Record unsubscribe replies, complaints and explicit requests here.
+              Suppression applies across duplicate business records.
+            </p>
+            <form onSubmit={suppress}>
+              <label className="field">
+                Business email
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="Email to suppress"
+                />
+              </label>
+              <label className="field">
+                Reason
+                <input
+                  name="reason"
+                  required
+                  minLength={3}
+                  maxLength={1000}
+                  placeholder="e.g. Unsubscribe reply received"
+                />
+              </label>
+              <button className="button secondary">
+                <ShieldCheck size={16} />
+                Suppress future email
+              </button>
+            </form>
+          </section>
+        </div>
+      </div>
+      <section className="panel runs-panel">
+        <h2>
+          Send history <span>{messages.length}</span>
+        </h2>
+        {messages.length ? (
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Recipient / subject</th>
+                  <th>Submission status</th>
+                  <th>Time</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {messages.map((message) => (
+                  <tr key={message.id}>
+                    <td>
+                      <strong>{message.recipient}</strong>
+                      <small className="run-message">{message.subject}</small>
+                    </td>
+                    <td>
+                      <span
+                        className={`source-status ${message.status === "accepted" ? "green" : message.status === "uncertain" ? "amber" : "gray"}`}
+                      >
+                        {message.status}
+                      </span>
+                    </td>
+                    <td>{new Date(message.createdAt).toLocaleString()}</td>
+                    <td>
+                      <details>
+                        <summary>Message & provider result</summary>
+                        <pre className="draft-text">{message.body}</pre>
+                        <p>{message.error || message.providerId}</p>
+                      </details>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="small-empty">
+            <Mail size={23} />
+            <p>
+              No messages sent. Open a live lead with a business email and
+              choose Compose email.
+            </p>
+          </div>
+        )}
+      </section>
+      <div className="info-box">
+        <Info size={18} />
+        <p>
+          Accepted means your SMTP server accepted submission. It does not mean
+          inbox delivery. Ambiguous submissions are retained and duplicate retry
+          requests are blocked.
+        </p>
+      </div>
+    </>
+  );
 }
